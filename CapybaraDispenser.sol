@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.22;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "./CapybaraToken.sol";
+import "./CapybaraNFTGate.sol";
 
 /**
  * @title CapybaraDispenser
@@ -11,10 +13,13 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 contract CapybaraDispenser {
 
     // CAPYBARA token (global for all families)
-    IERC20 public capybaraToken;
+    CapybaraToken public capybaraToken;
+
+    //100 $CAPYBARA per 1 stablecoin
+    uint256 effectiveRate = 100; 
 
     // Gate NFT contract (global for all families)
-    IERC721 public gateNFTContract;
+    CapybaraNFTGate public gateNFTContract;
 
     // External service URL that interacts with IPFS via a proxy server
     string public externalServiceBaseURI;
@@ -75,7 +80,7 @@ contract CapybaraDispenser {
 
 
     // Events
-    event MetadataFetched(uint256 indexed gateNFTId, string metadataJSON);
+    event MetadataFetched(string metadataJSON);
     event FamilySettingsUpdated(bytes32 familyId);
     event CapybaraExchanged(bytes32 familyId, address child, uint256 capybaraAmount, uint256 stablecoinAmount);
     event LiquidityDeposited(bytes32 familyId, address administrator, uint256 amount);
@@ -93,8 +98,10 @@ contract CapybaraDispenser {
         address _gateNFTContract,
         string memory _externalServiceBaseURI
     ) {
-        capybaraToken = IERC20(_capybaraToken);
-        gateNFTContract = IERC721(_gateNFTContract);
+        require(_capybaraToken != address(0), "Invalid token address");
+        require(_gateNFTContract != address(0), "Invalid NFT contract address");
+        capybaraToken = CapybaraToken(_capybaraToken);
+        gateNFTContract = CapybaraNFTGate(_gateNFTContract);
         externalServiceBaseURI = _externalServiceBaseURI;
     }
 
@@ -125,7 +132,7 @@ contract CapybaraDispenser {
      */
     function _fetchMetadataFromURI(string memory metadataURI) internal returns (string memory) {
         string memory fullURL = string(abi.encodePacked(externalServiceBaseURI, "/retrieve/", metadataURI));
-        emit MetadataFetched(block.timestamp, fullURL);
+        emit MetadataFetched(fullURL);
         return ""; // Assume fetched off-chain
     }
     
@@ -144,7 +151,6 @@ contract CapybaraDispenser {
     * @param stablecoin The stablecoin address for the family.
     * @param liquidity The liquidity available for the family.
     * @param dailyLimit The daily CAPYBARA token limit for the family.
-    * @param capybaraTokens Number of CAPYBARA tokens.
     * @param admins Array of administrators for the family.
     * @param children Array of children addresses.
     * @param dogeAddress The DOGE address for rewards.
@@ -154,7 +160,7 @@ contract CapybaraDispenser {
         address stablecoin,
         uint256 liquidity,
         uint256 dailyLimit,
-        uint256 capybaraTokens,
+        //uint256 capybaraTokens,
         address[] memory admins,
         address[] memory children,
         address dogeAddress
@@ -229,7 +235,6 @@ contract CapybaraDispenser {
         require(amount <= dailyCapybaraLimit[familyId], "Exceeds daily limit");
 
         //uint256 penaltyRate = familyPenalties[familyId].penaltyRate;
-        uint256 effectiveRate = 100; //100 $CAPYBARA per 1 stablecoin
         uint256 stablecoinAmount = (amount / effectiveRate);
 
         require(familyLiquidity[familyId] >= stablecoinAmount, "Insufficient liquidity");
